@@ -1,0 +1,7 @@
+# vscode conf
+
+.vscode/
+
+# go mod
+
+go.mod
