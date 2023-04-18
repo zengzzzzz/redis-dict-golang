@@ -31,6 +31,11 @@ func New() *Dict {
 	}
 }
 
+// String return the string of dict
+func (d *Dict) String() string {
+	return fmt.SPrintf("Dict(len = %d, cap = %d, isRehash = %v )", d.Len(), d.Cap(), d.isRehashing())
+}
+
 // Store add a key-value pair to dict
 func (d *Dict) Store(key, value interface{}) {}
 
