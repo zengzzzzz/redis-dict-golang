@@ -252,15 +252,17 @@ func newIterator(d *Dict, safe bool) *iterator {
 
 // rehash step
 func (d *Dict) rehashStep() {
-
+	if d.iterators == 0 {
+		d.rehash(1)
+	}
 }
 
 // Next return the next key-value pair
 func (it *iterator) next() *entry {
 	for {
 		if it.entry != nil {
-			if it.waitFirstInteration{
-				if it.safe{
+			if it.waitFirstInteration {
+				if it.safe {
 					it.d.iterators++
 				} else {
 					it.fingerprint = it.d.fingerprint()
@@ -268,13 +270,13 @@ func (it *iterator) next() *entry {
 			}
 			ht := it.d.hasTables[it.tableIndex]
 			if it.bucketIndex >= ht.size {
-				if !it.d.isRehashing()  || it.tableIndex != 0 {
+				if !it.d.isRehashing() || it.tableIndex != 0 {
 					return nil
 				}
 				it.tableIndex = 1
 				it.bucketIndex = 0
 				ht = it.d.hasTables[1]
-			} 
+			}
 			it.entry = ht.buckets[it.bucketIndex]
 			it.bucketIndex++
 		} else {
@@ -286,24 +288,106 @@ func (it *iterator) next() *entry {
 	}
 }
 
+// Release release the iterator
+func (it *iterator) release() {
+	if it.safe {
+		it.d.iterators--
+	} else {
+		fp := it.d.fingerprint()
+		if fp != it.fingerprint {
+			panic("operations like 'LoadOrStore', 'Load' or 'Delete' are not safe for an unsafe iterator")
+		}
+	}
+}
+
+// Range range all key-value pairs
+func (d *Dict) rangeDict(fn func(key, value interface{}) bool, safe bool) {
+	it := newIterator(d, safe)
+	defer it.release()
+	for {
+		if ent := it.next(); ent != nil {
+			if !fn(ent.key, ent.value) {
+				break
+			}
+		} else {
+			break
+		}
+	}
+}
+
+// fingerprint return the fingerprint of the dict
+func (d *Dict) fingerprint() int64 {
+	metas := []int64{
+		// meta of table 0
+		int64(uintptr(unsafe.Pointer(&d.hashTables[0].buckets))),
+		int64(d.hashTables[0].size),
+		int64(d.hashTables[0].used),
+		// meta of table 1
+		int64(uintptr(unsafe.Pointer(&d.hashTables[1].buckets))),
+		int64(d.hashTables[1].size),
+		int64(d.hashTables[1].used),
+	}
+
+	var hash int64
+	for _, meta := range metas {
+		hash += meta
+		// 使用 Tomas Wang 64 位整数 hash 算法
+		hash = (hash << 21) - hash - 1
+		hash = hash ^ (hash >> 24)
+		hash = (hash + (hash << 3)) + (hash << 8) // hash * 256
+		hash = hash ^ (hash >> 14)
+		hash = (hash + (hash << 2)) + (hash << 4) // hash * 21
+		hash = hash ^ (hash >> 28)
+		hash = hash + (hash << 31)
+	}
+
+	return hash
+}
+
 // Range range all key-value pairs
 func (d *Dict) Len() uint64 {
-
+	var _len uint64
+	for _, ht := range d.hasTables {
+		_len += ht.used
+	}
+	return _len
 }
 
 // Cap return the capacity of dict
 func (d *Dict) Cap() uint64 {
-
+	if d.isRehashing() {
+		return d.hasTables[1].size
+	}
+	return d.hasTables[0].size
 }
 
 // Range range all key-value pairs
-func (d *Dict) Range(fn func(key, value interface{}) bool) {}
+func (d *Dict) Range(fn func(key, value interface{}) bool) {
+	d.rangeDict(fn, false)
+}
 
 // RangeSafely range all key-value pairs safely
-func (d *Dict) RangeSafely(fn func(key, value interface{}) bool) {}
+func (d *Dict) RangeSafely(fn func(key, value interface{}) bool) {
+	d.rangeDict(fn, true)
+}
 
 // RehashForAWhile rehash for a while
-func (d *Dict) RehashForAWhile(duration time.Duration) {}
+func (d *Dict) RehashForAWhile(duration time.Duration) int64 {
+	tm := time.NewTimer(duration)
+	defer tm.Stop()
+	var rehashes int64
+	for {
+		select {
+		case <-tm.C:
+			return rehashes
+		default:
+			if d.rehash(100) {
+				return rehashes
+			}
+			rehashes += 100
+		}
+	}
+}
 
 // isRehashing return if the dict is rehashing
 func (d *Dict) isRehashing() bool {
