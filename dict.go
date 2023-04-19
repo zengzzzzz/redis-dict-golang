@@ -171,7 +171,7 @@ func (d *Dict) resizeTo(size uint64) error {
 	return nil
 }
 
-//  get the rehash size
+// get the rehash size
 func (d *Dict) nextPower(size unit64) uint64 {
 	if size >= math.MaxUint64 {
 		return math.MaxUint64
@@ -193,6 +193,72 @@ func (d *Dict) Resize() error {
 		size = _initiaHashtableSize
 	}
 	return d.resizeTo(size)
+}
+
+// rehash
+func (d *Dict) rehash(steps uint64) (finished bool) {
+	if !d.isRehashing() {
+		return true
+	}
+	maxEmptyBucketsMeets := 10 * size
+	src, dst := d.hasTables[0], d.hasTables[1]
+	for ; steps > 0 && src.used != 0; steps-- {
+		for src.buckets[d.rehashIndex] == nil {
+			d.rehashIndex++
+			maxEmptyBucketsMeets--
+			if maxEmptyBucketsMeets <= 0 {
+				return false
+			}
+		}
+
+		for ent := src.buckets[d.rehashIndex]; ent != nil; {
+			next := ent.next
+			idx := SipHash(ent.key) & dst.sizemask
+			ent.next = dst.buckets[idx]
+			dst.buckets[idx] = ent
+			src.used--
+			dst.used++
+			ent = next
+		}
+		src.buckets[d.rehashIndex] = nil
+		d.rehashIndex++
+	}
+	if src.used == 0 {
+		d.hashTables[0] = dst
+		d.hashTables[1] = &hashTable{}
+		d.rehashIndex = -1
+		return true
+	}
+	return false
+}
+
+type iterator struct {
+	d                   *Dict
+	tableIndex          int
+	safe                bool
+	fingerprint         int64
+	entry               *entry
+	bucketIndex         uint64
+	waitFirstInteration bool
+}
+
+func newIterator(d *Dict, safe bool) *iterator {
+	return &iterator{
+		d:                   d,
+		safe:                safe,
+		waitFirstInteration: true,
+	}
+}
+
+// rehash step
+func (d *Dict) rehashStep() {
+
+}
+
+// Next return the next key-value pair
+func (it *iterator) next() *entry {
+	for {
+	}
 }
 
 // Range range all key-value pairs
