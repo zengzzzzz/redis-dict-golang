@@ -258,14 +258,43 @@ func (d *Dict) rehashStep() {
 // Next return the next key-value pair
 func (it *iterator) next() *entry {
 	for {
+		if it.entry != nil {
+			if it.waitFirstInteration{
+				if it.safe{
+					it.d.iterators++
+				} else {
+					it.fingerprint = it.d.fingerprint()
+				}
+			}
+			ht := it.d.hasTables[it.tableIndex]
+			if it.bucketIndex >= ht.size {
+				if !it.d.isRehashing()  || it.tableIndex != 0 {
+					return nil
+				}
+				it.tableIndex = 1
+				it.bucketIndex = 0
+				ht = it.d.hasTables[1]
+			} 
+			it.entry = ht.buckets[it.bucketIndex]
+			it.bucketIndex++
+		} else {
+			it.entry = it.entry.next
+		}
+		if it.entry != nil {
+			return it.entry
+		}
 	}
 }
 
 // Range range all key-value pairs
-func (d *Dict) Len() uint64 {}
+func (d *Dict) Len() uint64 {
+
+}
 
 // Cap return the capacity of dict
-func (d *Dict) Cap() uint64 {}
+func (d *Dict) Cap() uint64 {
+
+}
 
 // Range range all key-value pairs
 func (d *Dict) Range(fn func(key, value interface{}) bool) {}
