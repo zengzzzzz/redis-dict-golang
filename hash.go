@@ -19,7 +19,7 @@ func SipHash(v interface{}) uint64 {
 		uint, uint8, uint16, uint32, uint64:
 		data = []byte(fmt.Sprintf("%d", iv))
 	default:
-		panic((fmt.SPrintf("key type %s is not supported", reflect.TypeOf(iv).String())))
+		panic((fmt.Sprintf("key type %s is not supported", reflect.TypeOf(iv).String())))
 	}
 	siph.Reset()
 	_, _ = siph.Write(data)

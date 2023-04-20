@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"math"
 	"time"
+	"errors"
+	"unsafe"
 )
 
 const (
@@ -11,7 +13,7 @@ const (
 )
 
 type Dict struct {
-	hasTables   []*hashTable
+	hashTables   []*hashTable
 	rehashIndex int64
 	iterators   uint64
 }
@@ -24,7 +26,7 @@ type hashTable struct {
 }
 
 type entry struct {
-	key, vaule interface{}
+	key, value interface{}
 	next       *entry
 }
 
@@ -39,16 +41,16 @@ func New() *Dict {
 
 // String return the string of dict
 func (d *Dict) String() string {
-	return fmt.SPrintf("Dict(len = %d, cap = %d, isRehash = %v )", d.Len(), d.Cap(), d.isRehashing())
+	return fmt.Sprintf("Dict(len = %d, cap = %d, isRehash = %v )", d.Len(), d.Cap(), d.isRehashing())
 }
 
 // get the key index in hash table
 func (d *Dict) keyIndex(key interface{}) (idx uint64, existed *entry) {
 	hash := SipHash(key)
 	for i := 0; i < 2; i++ {
-		ht := d.hasTables[i]
+		ht := d.hashTables[i]
 		idx = ht.sizemask & hash
-		for ent := ht.buckets[idx]; en != nil; ent = ent.next {
+		for ent := ht.buckets[idx]; ent != nil; ent = ent.next {
 			if ent.key == key {
 				return idx, ent
 			}
@@ -62,7 +64,7 @@ func (d *Dict) keyIndex(key interface{}) (idx uint64, existed *entry) {
 
 // Store add a key-value pair to dict
 func (d *Dict) Store(key, value interface{}) {
-	ent, loaded := d.LoadOrStore(key, value)
+	ent, loaded := d.loadOrStore(key, value)
 	if loaded {
 		ent.value = value
 	}
@@ -81,15 +83,15 @@ func (d *Dict) Load(key interface{}) (value interface{}, ok bool) {
 }
 
 // LoadOrStore get a value by key, if not exist, add it
-func (d *Dict) LoadOrStore(key, value interface{}) (actual interface{}, loaded bool) {
+func (d *Dict) loadOrStore(key, value interface{}) (ent *entry, loaded bool) {
 	if d.isRehashing() {
 		d.rehashStep()
 	}
 	_ = d.expandIfNeeded()
 	idx, existed := d.keyIndex(key)
-	ht := d.hasTables[0]
+	ht := d.hashTables[0]
 	if d.isRehashing() {
-		ht = d.hasTables[1]
+		ht = d.hashTables[1]
 	}
 	if existed != nil {
 		return existed, true
@@ -111,8 +113,8 @@ func (d *Dict) Delete(key interface{}) {
 	}
 	hash := SipHash(key)
 	for i := 0; i < 2; i++ {
-		ht := d.hasTables[i]
-		idx = ht.sizemask & hash
+		ht := d.hashTables[i]
+		idx := ht.sizemask & hash
 		var prevEntry *entry
 		for ent := ht.buckets[idx]; ent != nil; ent = ent.next {
 			if ent.key == key {
@@ -140,18 +142,18 @@ func (d *Dict) expandIfNeeded() error {
 	if d.isRehashing() {
 		return nil
 	}
-	if d.hasTables[0].used == 0 {
+	if d.hashTables[0].used == 0 {
 		return d.resizeTo(_initiaHashtableSize)
 	}
-	if d.hashTables[0].used == d.hasTables[0].size {
-		return d.resizeTo(d.hasTables[0].size * 2)
+	if d.hashTables[0].used == d.hashTables[0].size {
+		return d.resizeTo(d.hashTables[0].size * 2)
 	}
 	return nil
 }
 
 // resizeTo resize the dict to size
 func (d *Dict) resizeTo(size uint64) error {
-	if d.isRehashing() || d.hasTables[0].used > size {
+	if d.isRehashing() || d.hashTables[0].used > size {
 		return errors.New("faileed to resize")
 	}
 	size = d.nextPower(size)
@@ -172,7 +174,7 @@ func (d *Dict) resizeTo(size uint64) error {
 }
 
 // get the rehash size
-func (d *Dict) nextPower(size unit64) uint64 {
+func (d *Dict) nextPower(size uint64) uint64 {
 	if size >= math.MaxUint64 {
 		return math.MaxUint64
 	}
@@ -188,7 +190,7 @@ func (d *Dict) Resize() error {
 	if d.isRehashing() {
 		return errors.New("dict is rehashing")
 	}
-	size := d.hasTables[0].used
+	size := d.hashTables[0].used
 	if size < _initiaHashtableSize {
 		size = _initiaHashtableSize
 	}
@@ -200,8 +202,8 @@ func (d *Dict) rehash(steps uint64) (finished bool) {
 	if !d.isRehashing() {
 		return true
 	}
-	maxEmptyBucketsMeets := 10 * size
-	src, dst := d.hasTables[0], d.hasTables[1]
+	maxEmptyBucketsMeets := 10 * steps
+	src, dst := d.hashTables[0], d.hashTables[1]
 	for ; steps > 0 && src.used != 0; steps-- {
 		for src.buckets[d.rehashIndex] == nil {
 			d.rehashIndex++
@@ -268,14 +270,14 @@ func (it *iterator) next() *entry {
 					it.fingerprint = it.d.fingerprint()
 				}
 			}
-			ht := it.d.hasTables[it.tableIndex]
+			ht := it.d.hashTables[it.tableIndex]
 			if it.bucketIndex >= ht.size {
 				if !it.d.isRehashing() || it.tableIndex != 0 {
 					return nil
 				}
 				it.tableIndex = 1
 				it.bucketIndex = 0
-				ht = it.d.hasTables[1]
+				ht = it.d.hashTables[1]
 			}
 			it.entry = ht.buckets[it.bucketIndex]
 			it.bucketIndex++
@@ -347,7 +349,7 @@ func (d *Dict) fingerprint() int64 {
 // Range range all key-value pairs
 func (d *Dict) Len() uint64 {
 	var _len uint64
-	for _, ht := range d.hasTables {
+	for _, ht := range d.hashTables {
 		_len += ht.used
 	}
 	return _len
@@ -356,9 +358,9 @@ func (d *Dict) Len() uint64 {
 // Cap return the capacity of dict
 func (d *Dict) Cap() uint64 {
 	if d.isRehashing() {
-		return d.hasTables[1].size
+		return d.hashTables[1].size
 	}
-	return d.hasTables[0].size
+	return d.hashTables[0].size
 }
 
 // Range range all key-value pairs
