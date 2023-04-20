@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	siph = siphash.New([]byte(""))
+    siph = siphash.New([]byte("1234123456789012"))
 )
 
 func SipHash(v interface{}) uint64 {

@@ -13,13 +13,13 @@ func TestSipHash(t *testing.T) {
 	}{
 		{
 			name: "string input",
-			in:   "hello world",
-			want: 5333013848549256545,
+			in:   "string key",
+			want: 10057810252675432601,
 		},
 		{
 			name: "int input",
-			in:   123,
-			want: 15493594227354133703,
+			in:   100,
+			want: 8497251319755255498,
 		},
 		{
 			name: "unsupported input type",
@@ -31,7 +31,7 @@ func TestSipHash(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			defer func() {
-				if r := recover(); r == nil {
+				if r := recover(); r != nil {
 					if tt.want != 0 {
 						t.Errorf("SipHash() did not panic on unsupported input type")
 					}
