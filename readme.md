@@ -2,7 +2,7 @@
 
 # Go Redis Dictionary Implementation
 
-This is a Go implementation of a dictionary data structure. The implementation uses a hash table to store key-value pairs.
+This is an implementation of the dict data structure in Redis using golang. The implementation uses a hash table to store key-value pairs.
 
 ## Features
 
