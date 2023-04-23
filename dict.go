@@ -1,10 +1,10 @@
 package dict
 
 import (
+	"errors"
 	"fmt"
 	"math"
 	"time"
-	"errors"
 	"unsafe"
 )
 
@@ -13,7 +13,7 @@ const (
 )
 
 type Dict struct {
-	hashTables   []*hashTable
+	hashTables  []*hashTable
 	rehashIndex int64
 	iterators   uint64
 }
@@ -50,6 +50,9 @@ func (d *Dict) keyIndex(key interface{}) (idx uint64, existed *entry) {
 	for i := 0; i < 2; i++ {
 		ht := d.hashTables[i]
 		idx = ht.sizemask & hash
+		if idx > ht.size {
+			return idx, nil
+		}
 		for ent := ht.buckets[idx]; ent != nil; ent = ent.next {
 			if ent.key == key {
 				return idx, ent
@@ -262,7 +265,7 @@ func (d *Dict) rehashStep() {
 // Next return the next key-value pair
 func (it *iterator) next() *entry {
 	for {
-		if it.entry != nil {
+		if it.entry == nil {
 			if it.waitFirstInteration {
 				if it.safe {
 					it.d.iterators++
