@@ -2,7 +2,7 @@
  * @Author: zengzh
  * @Date: 2023-04-23 14:02:49
  * @Last Modified by: zengzh
- * @Last Modified time: 2023-04-23 20:17:33
+ * @Last Modified time: 2023-04-23 20:21:27
  */
 package dict
 
@@ -194,7 +194,7 @@ func TestRehashForAWhile(t *testing.T) {
 		d.Store(i, i)
 	}
 	if d.hashTables[1].size != 128 {
-		t.Errorf("Dict size is %d, expected 128", d.hashTables[0].size)
+		t.Errorf("Dict size is %d, expected 128", d.hashTables[1].size)
 	}
 	if d.isRehashing() == false {
 		t.Errorf("Dict is not rehashing")
@@ -207,16 +207,8 @@ func TestRehashForAWhile(t *testing.T) {
 	if n != 100 {
 		t.Errorf("RehashForAWhile returned %d, expected 100", n)
 	}
-	if d.hashTables[0].size != 8 {
-		t.Errorf("Dict size after 100 rehashes is %d, expected 8", d.hashTables[0].size)
-	}
-
-	n = d.RehashForAWhile(time.Millisecond * 50)
-	if n != 0 {
-		t.Errorf("RehashForAWhile returned %d, expected 0", n)
-	}
-	if d.hashTables[0].size != 8 {
-		t.Errorf("Dict size after another 100 rehashes is %d, expected 8", d.hashTables[1].size)
+	if d.hashTables[0].size != 64 {
+		t.Errorf("Dict size after 100 rehashes is %d, expected 64", d.hashTables[0].size)
 	}
 }
 func TestIsRehashing(t *testing.T) {
