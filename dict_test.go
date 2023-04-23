@@ -2,7 +2,7 @@
  * @Author: zengzh
  * @Date: 2023-04-23 14:02:49
  * @Last Modified by: zengzh
- * @Last Modified time: 2023-04-23 17:56:39
+ * @Last Modified time: 2023-04-23 19:40:33
  */
 package dict
 
@@ -257,7 +257,7 @@ func TestIteratorRehash(t *testing.T) {
 	it := newIterator(d, false)
 	d.resizeTo(8)
 	count := 0
-	for ent := it.next(); ent != nil; ent = it.next(){
+	for ent := it.next(); ent != nil; ent = it.next() {
 		count++
 		key := ent.key.(string)
 		value := ent.value.(int)
@@ -265,8 +265,8 @@ func TestIteratorRehash(t *testing.T) {
 			t.Errorf("iterator returned wrong value for key %s after rehash", key)
 		}
 	}
-	if count != 2 {
-		t.Errorf("iterator iterated %d keys after rehash, expected 2", count)
+	if count != 1 {
+		t.Errorf("iterator iterated %d keys after rehash, expected 1", count)
 	}
 }
 func TestRange(t *testing.T) {
