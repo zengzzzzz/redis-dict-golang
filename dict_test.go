@@ -2,7 +2,7 @@
  * @Author: zengzh
  * @Date: 2023-04-23 14:02:49
  * @Last Modified by: zengzh
- * @Last Modified time: 2023-04-23 19:40:33
+ * @Last Modified time: 2023-04-23 20:17:33
  */
 package dict
 
@@ -190,19 +190,20 @@ func TestNextPower(t *testing.T) {
 
 func TestRehashForAWhile(t *testing.T) {
 	d := New()
-	d.Store("a", 1)
-	d.Store("b", 2)
-
-	// 字典初始大小为4,rehashIndex为0
-	if d.hashTables[0].size != 4 {
-		t.Errorf("Dict size is %d, expected 4", d.hashTables[0].size)
+	for i := 0; i < 100; i++ {
+		d.Store(i, i)
 	}
-	if d.rehashIndex != -1 {
-		t.Errorf("rehashIndex is %d, expected -1", d.rehashIndex)
+	if d.hashTables[1].size != 128 {
+		t.Errorf("Dict size is %d, expected 128", d.hashTables[0].size)
+	}
+	if d.isRehashing() == false {
+		t.Errorf("Dict is not rehashing")
 	}
 
-	// rehash 100次,table大小变为8
-	n := d.RehashForAWhile(time.Millisecond * 50)
+	n := d.RehashForAWhile(time.Microsecond * 5)
+	if d.isRehashing() == true {
+		t.Errorf("Dict is rehashing")
+	}
 	if n != 100 {
 		t.Errorf("RehashForAWhile returned %d, expected 100", n)
 	}
@@ -210,7 +211,6 @@ func TestRehashForAWhile(t *testing.T) {
 		t.Errorf("Dict size after 100 rehashes is %d, expected 8", d.hashTables[0].size)
 	}
 
-	// 再rehash 100次,table大小不变,返回0
 	n = d.RehashForAWhile(time.Millisecond * 50)
 	if n != 0 {
 		t.Errorf("RehashForAWhile returned %d, expected 0", n)
@@ -288,7 +288,7 @@ func TestRangeSafely(t *testing.T) {
 	d.Store("a", 1)
 	d.Store("b", 2)
 	d.RangeSafely(func(key, value interface{}) bool {
-		d.Delete("a") // 不应该改变迭代器遍历的键值对
+		d.Delete("a")
 		return true
 	})
 	if v, _ := d.Load("a"); v != nil {

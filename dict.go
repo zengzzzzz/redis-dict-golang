@@ -1,8 +1,8 @@
 /*
- * @Author: zengzh 
- * @Date: 2023-04-23 19:48:01 
- * @Last Modified by:   zengzh 
- * @Last Modified time: 2023-04-23 19:48:01 
+ * @Author: zengzh
+ * @Date: 2023-04-23 19:48:01
+ * @Last Modified by: zengzh
+ * @Last Modified time: 2023-04-23 19:56:55
  */
 package dict
 
@@ -386,6 +386,7 @@ func (d *Dict) RangeSafely(fn func(key, value interface{}) bool) {
 func (d *Dict) RehashForAWhile(duration time.Duration) int64 {
 	tm := time.NewTimer(duration)
 	defer tm.Stop()
+
 	var rehashes int64
 	for {
 		select {
